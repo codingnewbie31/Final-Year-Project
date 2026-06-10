@@ -1,0 +1,70 @@
+{
+  "hash": "3a6a75fd",
+  "configHash": "c0439ae8",
+  "lockfileHash": "ce10d26b",
+  "browserHash": "9e5cf700",
+  "optimized": {
+    "framer-motion": {
+      "src": "../../node_modules/framer-motion/dist/es/index.mjs",
+      "file": "framer-motion.js",
+      "fileHash": "03328bb1",
+      "needsInterop": false
+    },
+    "framer-motion/client": {
+      "src": "../../node_modules/framer-motion/dist/es/client.mjs",
+      "file": "framer-motion_client.js",
+      "fileHash": "28c2c0c2",
+      "needsInterop": false
+    },
+    "lucide-react": {
+      "src": "../../node_modules/lucide-react/dist/esm/lucide-react.mjs",
+      "file": "lucide-react.js",
+      "fileHash": "e24fa350",
+      "needsInterop": false
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "c7ffa576",
+      "needsInterop": true
+    },
+    "react-hot-toast": {
+      "src": "../../node_modules/react-hot-toast/dist/index.mjs",
+      "file": "react-hot-toast.js",
+      "fileHash": "746010f0",
+      "needsInterop": false
+    },
+    "react-router-dom": {
+      "src": "../../node_modules/react-router-dom/dist/index.mjs",
+      "file": "react-router-dom.js",
+      "fileHash": "f610897b",
+      "needsInterop": false
+    },
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "dcdad334",
+      "needsInterop": true
+    },
+    "react/jsx-dev-runtime": {
+      "src": "../../node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "b87ab6c5",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "feature-bundle-CGK7wKN5": {
+      "file": "feature-bundle-CGK7wKN5.js",
+      "isDynamicEntry": false
+    },
+    "react-BDWiK9rz": {
+      "file": "react-BDWiK9rz.js",
+      "isDynamicEntry": false
+    },
+    "react-dom-C08K6auO": {
+      "file": "react-dom-C08K6auO.js",
+      "isDynamicEntry": false
+    }
+  }
+}
