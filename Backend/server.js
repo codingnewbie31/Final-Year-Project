@@ -9,6 +9,8 @@ const jobRoutes = require("./routes/jobRoutes");
 const applicationRoutes = require("./routes/applicationRoutes");
 const savedJobsRoutes = require("./routes/savedJobsRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
+const app = require("./app");
+const connectDB = require("./config/db");
 
 const app = express();
 
