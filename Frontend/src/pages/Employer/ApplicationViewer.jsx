@@ -38,10 +38,9 @@ const ApplicationViewer = () => {
       const response = await axiosInstance.get(
         API_PATHS.APPLICATIONS.GET_ALL_APPLICATIONS(jobId),
       );
-      console.log("Applications data:", response.data);
       setApplications(response.data);
     } catch (err) {
-      console.log("Failed to fetch applications:", err);
+
     } finally {
       setIsLoading(false);
     }
@@ -79,7 +78,6 @@ const ApplicationViewer = () => {
 
   // --- Event Handlers ---
   const handleDownloadResume = (resumeUrl) => {
-    console.log("Resume URL:", resumeUrl);
     if (resumeUrl) {
       window.open(resumeUrl, "_blank");
     }

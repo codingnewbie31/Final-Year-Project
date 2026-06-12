@@ -1,4 +1,11 @@
-import { Bookmark, Building, Building2, Calendar, MapPin } from "lucide-react";
+import {
+  Bookmark,
+  Building,
+  Building2,
+  Calendar,
+  MapPin,
+  Users,
+} from "lucide-react";
 import moment from "moment";
 import { useAuth } from "../../context/AuthContext";
 import StatusBadge from "../StatusBadge";
@@ -105,6 +112,12 @@ const JobCard = ({ job, onClick, onToggleSave, onApply, saved, hideApply }) => {
               : "N/A"}
           </span>
         </div>
+
+        {/* Applicant Count */}
+        <span className="flex items-center gap-1 text-xs text-gray-400">
+          <Users className="h-3.5 w-3.5" />
+          {job?.applicantCount || 0} applied
+        </span>
 
         {/* Action */}
         {!saved && (

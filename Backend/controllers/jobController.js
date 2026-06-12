@@ -7,23 +7,68 @@ const SavedJob = require("../models/SavedJob");
 exports.createJob = async (req, res) => {
   try {
     if (req.user.role !== "employer") {
-      return res.status(403).json({ message: "Only employers can post jobs" });
+      return res.status(403).json({
+        message: "Only employers can post jobs",
+      });
     }
 
-    const job = await Job.create({ ...req.body, company: req.user._id });
+    if (req.body.isUrgent) {
+      if (!req.body.shiftStartTime) {
+        return res.status(400).json({
+          message: "Shift start time is required for urgent jobs",
+        });
+      }
+
+      const shiftDate = new Date(req.body.shiftStartTime);
+
+      if (isNaN(shiftDate.getTime())) {
+        return res.status(400).json({
+          message: "Invalid shift start time",
+        });
+      }
+
+      if (shiftDate <= new Date()) {
+        return res.status(400).json({
+          message: "Shift start time must be in the future",
+        });
+      }
+    }
+
+    const job = await Job.create({
+      ...req.body,
+      company: req.user._id,
+    });
+
     res.status(201).json(job);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
 // @desc    Get jobs
 exports.getJobs = async (req, res) => {
-  const { keyword, location, category, type, minSalary, maxSalary, userId } =
-    req.query;
+  const {
+    keyword,
+    location,
+    category,
+    type,
+    minSalary,
+    maxSalary,
+    page = 1,
+    limit = 6,
+  } = req.query;
+  const userId = req.user?._id || req.query.userId;
 
   const query = {
     isClosed: false,
+    // Auto-expire urgent jobs
+    $or: [
+      { isUrgent: false },
+      { isUrgent: true, shiftStartTime: { $gte: new Date() } },
+      { isUrgent: { $exists: false } },
+    ],
     ...(keyword && { title: { $regex: keyword, $options: "i" } }),
     ...(location && { location: { $regex: location, $options: "i" } }),
     ...(category && { category }),
@@ -46,10 +91,15 @@ exports.getJobs = async (req, res) => {
     }
   }
   try {
-    const jobs = await Job.find(query).populate(
-      "company",
-      "name companyName companyLogo",
-    );
+    const skip = (Number(page) - 1) * Number(limit);
+    const totalJobs = await Job.countDocuments(query);
+    const totalPages = Math.ceil(totalJobs / Number(limit));
+
+    const jobs = await Job.find(query)
+      .populate("company", "name companyName companyLogo")
+      .sort({ isUrgent: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
 
     let savedJobIds = [];
     let appliedJobStatusMap = {};
@@ -71,16 +121,27 @@ exports.getJobs = async (req, res) => {
     }
 
     // Add isSaved and applicationStatus to each job
-    const jobsWithExtras = jobs.map((job) => {
-      const jobIdStr = String(job._id);
-      return {
-        ...job.toObject(),
-        isSaved: savedJobIds.includes(jobIdStr),
-        applicationStatus: appliedJobStatusMap[jobIdStr] || null,
-      };
-    });
+    const jobsWithExtras = await Promise.all(
+      jobs.map(async (job) => {
+        const jobIdStr = String(job._id);
+        const applicantCount = await Application.countDocuments({
+          job: job._id,
+        });
+        return {
+          ...job.toObject(),
+          isSaved: savedJobIds.includes(jobIdStr),
+          applicationStatus: appliedJobStatusMap[jobIdStr] || null,
+          applicantCount,
+        };
+      }),
+    );
 
-    res.json(jobsWithExtras);
+    res.json({
+      jobs: jobsWithExtras,
+      page: Number(page),
+      totalPages,
+      totalJobs,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -175,7 +236,6 @@ exports.updateJob = async (req, res) => {
   }
 };
 
-
 // @desc    Delete a job (Employer only)
 exports.deleteJob = async (req, res) => {
   try {
@@ -195,7 +255,6 @@ exports.deleteJob = async (req, res) => {
   }
 };
 
-
 // @desc    Toggle Close Status for a job (Employer only)
 exports.toggleCloseJob = async (req, res) => {
   try {
@@ -211,9 +270,10 @@ exports.toggleCloseJob = async (req, res) => {
     job.isClosed = !job.isClosed;
     await job.save();
 
-    res.json({ message: job.isClosed ? "Job marked as closed" : "Job marked as open" });
+    res.json({
+      message: job.isClosed ? "Job marked as closed" : "Job marked as open",
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
-

@@ -89,7 +89,7 @@ const EmployerDashboard = () => {
         setDashboardData(response.data);
       }
     } catch (error) {
-      console.log("error");
+
     } finally {
       setIsLoading(false);
     }

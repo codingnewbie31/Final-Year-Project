@@ -1,8 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 
-// ── Mock framer-motion (animations break in jsdom) ──────────────────
+// ── Mock framer-motion ───────────────────────────────────────────────
 vi.mock('framer-motion', () => ({
   motion: {
     div: ({ children, ...props }) => <div {...props}>{children}</div>,
@@ -17,22 +18,25 @@ vi.mock('../context/AuthContext', () => ({
 
 // ── Mock axiosInstance ───────────────────────────────────────────────
 vi.mock('../utils/axiosInstance', () => ({
-  default: {
-    post: vi.fn(),
-  },
+  default: { post: vi.fn() },
 }))
 
 // ── Mock apiPaths ────────────────────────────────────────────────────
 vi.mock('../utils/apiPaths', () => ({
   API_PATHS: {
-    AUTH: {
-      LOGIN: '/api/auth/login',
-    },
+    AUTH: { LOGIN: '/api/auth/login' },
   },
 }))
 
 import axiosInstance from '../utils/axiosInstance'
 import Login from '../pages/Auth/Login'
+
+// ── Helper to render with Router ─────────────────────────────────────
+const renderLogin = () => render(
+  <MemoryRouter>
+    <Login />
+  </MemoryRouter>
+)
 
 // ────────────────────────────────────────────────────────────────────
 describe('Login Form', () => {
@@ -43,7 +47,7 @@ describe('Login Form', () => {
 
   // ✅ Test 1: Form renders correctly
   test('renders email and password fields and submit button', () => {
-    render(<Login />)
+    renderLogin()
     expect(screen.getByPlaceholderText('Enter your email')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Enter your password')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
@@ -51,7 +55,7 @@ describe('Login Form', () => {
 
   // ✅ Test 2: User can type in fields
   test('allows user to type in email and password fields', async () => {
-    render(<Login />)
+    renderLogin()
     const emailInput = screen.getByPlaceholderText('Enter your email')
     const passwordInput = screen.getByPlaceholderText('Enter your password')
 
@@ -64,7 +68,7 @@ describe('Login Form', () => {
 
   // ✅ Test 3: Shows validation errors on empty submit
   test('shows validation errors when form is submitted empty', async () => {
-    render(<Login />)
+    renderLogin()
     await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => {
@@ -74,27 +78,23 @@ describe('Login Form', () => {
 
   // ✅ Test 4: Password visibility toggle
   test('toggles password visibility when eye icon is clicked', async () => {
-    render(<Login />)
+    renderLogin()
     const passwordInput = screen.getByPlaceholderText('Enter your password')
-
-    expect(passwordInput).toHaveAttribute('type', 'password')
-
-    // the toggle button is the one without a text name (eye icon)
     const buttons = screen.getAllByRole('button')
     const toggleButton = buttons.find(b => b.getAttribute('type') === 'button')
 
+    expect(passwordInput).toHaveAttribute('type', 'password')
     await userEvent.click(toggleButton)
     expect(passwordInput).toHaveAttribute('type', 'text')
-
     await userEvent.click(toggleButton)
     expect(passwordInput).toHaveAttribute('type', 'password')
   })
 
-  // ✅ Test 5: Shows loading state while submitting
+  // ✅ Test 5: Shows loading state
   test('shows loading spinner when form is being submitted', async () => {
     axiosInstance.post.mockImplementation(() => new Promise(() => {}))
 
-    render(<Login />)
+    renderLogin()
     await userEvent.type(screen.getByPlaceholderText('Enter your email'), 'test@example.com')
     await userEvent.type(screen.getByPlaceholderText('Enter your password'), 'password123')
     await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
@@ -110,7 +110,7 @@ describe('Login Form', () => {
       response: { data: { message: 'Invalid credentials' } },
     })
 
-    render(<Login />)
+    renderLogin()
     await userEvent.type(screen.getByPlaceholderText('Enter your email'), 'test@example.com')
     await userEvent.type(screen.getByPlaceholderText('Enter your password'), 'wrongpassword')
     await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
@@ -120,9 +120,9 @@ describe('Login Form', () => {
     })
   })
 
-  // ✅ Test 7: Sign up link is present
+  // ✅ Test 7: Sign up link
   test('renders a link to the signup page', () => {
-    render(<Login />)
+    renderLogin()
     const link = screen.getByRole('link', { name: /create one here/i })
     expect(link).toHaveAttribute('href', '/signup')
   })

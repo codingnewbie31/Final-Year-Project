@@ -35,6 +35,8 @@ const JobPostingForm = () => {
     salaryMin: "",
     salaryMax: "",
     salaryPeriod: "yearly",
+    isUrgent: false,
+    shiftStartTime: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -71,6 +73,8 @@ const JobPostingForm = () => {
       salaryMin: formData.salaryMin,
       salaryMax: formData.salaryMax,
       salaryPeriod: formData.salaryPeriod,
+      isUrgent: formData.isUrgent,
+      shiftStartTime: formData.isUrgent ? formData.shiftStartTime : null,
     };
 
     try {
@@ -148,6 +152,10 @@ const JobPostingForm = () => {
       errors.salary = "Maximum salary must be greater than minimum salary";
     }
 
+    if (formData.isUrgent && !formData.shiftStartTime) {
+      errors.shiftStartTime = "Please set a shift start time for urgent jobs";
+    }
+
     return errors;
   };
 
@@ -187,8 +195,7 @@ const JobPostingForm = () => {
     return () => {
       // Reset or abort operations if needed
     };
-  }, [jobId]); 
-
+  }, [jobId]);
 
   const isFormValid = () => {
     const validationErrors = validateForm(formData);
@@ -413,7 +420,65 @@ const JobPostingForm = () => {
                 </div>
               </div>
 
-              {}
+              {/* Urgent Shift Toggle */}
+              <div className="border border-orange-200 bg-orange-50 rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-orange-100 rounded-lg flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        Mark as Urgent
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Job seekers will see a countdown timer
+                      </p>
+                    </div>
+                  </div>
+                  {/* Toggle Switch */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleInputChange("isUrgent", !formData.isUrgent)
+                    }
+                    className={`relative w-11 h-6 rounded-full transition-colors duration-300 ${
+                      formData.isUrgent ? "bg-orange-500" : "bg-gray-200"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 ${
+                        formData.isUrgent ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Shift Start Time — only show when urgent is ON */}
+                {formData.isUrgent && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Shift Start Time <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={formData.shiftStartTime}
+                      onChange={(e) =>
+                        handleInputChange("shiftStartTime", e.target.value)
+                      }
+                      min={new Date().toISOString().slice(0, 16)}
+                      className="w-full px-4 py-2.5 border border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm bg-white"
+                    />
+                    {errors.shiftStartTime && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors.shiftStartTime}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Submit Button */}
               <div className="pt-2">
                 <button
                   type="submit"

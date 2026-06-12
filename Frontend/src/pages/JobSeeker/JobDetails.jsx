@@ -45,7 +45,6 @@ const JobDetails = () => {
 
       getJobDetailsById();
     } catch (err) {
-      console.log("Error:", err);
       const errorMsg = err?.response?.data?.message;
       toast.error(errorMsg || "Something went wrong! Try again later");
     }

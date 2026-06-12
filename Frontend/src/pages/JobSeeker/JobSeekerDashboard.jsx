@@ -20,6 +20,36 @@ const JobSeekerDashboard = () => {
   const [viewMode, setViewMode] = useState("grid");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalJobs, setTotalJobs] = useState(0);
+
+  const CountdownTimer = ({ shiftStartTime }) => {
+    const [timeLeft, setTimeLeft] = useState("");
+
+    useEffect(() => {
+      const update = () => {
+        const diff = new Date(shiftStartTime) - new Date();
+        if (diff <= 0) {
+          setTimeLeft("Starting now!");
+          return;
+        }
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        setTimeLeft(`${h}h ${m}m ${s}s`);
+      };
+      update();
+      const timer = setInterval(update, 1000);
+      return () => clearInterval(timer);
+    }, [shiftStartTime]);
+
+    return (
+      <span className="text-orange-600 font-bold text-sm">
+        ⏱ Starts in {timeLeft}
+      </span>
+    );
+  };
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -58,16 +88,18 @@ const JobSeekerDashboard = () => {
       if (filterParams.category)
         params.append("category", filterParams.category);
       if (user) params.append("userId", user?._id);
+      params.append("page", filterParams.page || 1);
+      params.append("limit", 6);
 
       const response = await axiosInstance.get(
         `${API_PATHS.JOBS.GET_ALL_JOBS}?${params.toString()}`,
       );
 
-      const jobsData = Array.isArray(response.data)
-        ? response.data
-        : response.data.jobs || [];
+      const jobsData = response.data.jobs || [];
 
       setJobs(jobsData);
+      setTotalPages(response.data.totalPages || 1);
+      setTotalJobs(response.data.totalJobs || 0);
     } catch (err) {
       console.error("Error fetching jobs:", err);
       setError("Failed to fetch jobs. Please try again later.");
@@ -91,7 +123,6 @@ const JobSeekerDashboard = () => {
         remoteOnly: filters.remoteOnly,
       };
 
-      // Only call API if there are meaningful filters
       const hasFilters = Object.values(apiFilters).some(
         (value) =>
           value !== "" &&
@@ -101,17 +132,18 @@ const JobSeekerDashboard = () => {
       );
 
       if (hasFilters) {
-        fetchJobs(apiFilters);
+        fetchJobs({ ...apiFilters, page: currentPage });
       } else {
-        fetchJobs(); // Fetch all jobs if no filters
+        fetchJobs({ page: currentPage });
       }
-    }, 500); // 500ms debounce
+    }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [filters, user]);
+  }, [filters, user, currentPage]);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
+    setCurrentPage(1); // reset to page 1 when filters change
   };
 
   const toggleSection = (section) => {
@@ -166,10 +198,17 @@ const JobSeekerDashboard = () => {
         await axiosInstance.post(API_PATHS.APPLICATIONS.APPLY_TO_JOB(jobId));
         toast.success("Applied to job successfully!");
 
-        // Local state update: Mark this specific job as applied instantly
+        // Local state update: Mark as applied AND increment count instantly
         setJobs((prevJobs) =>
           prevJobs.map((job) =>
-            job._id === jobId ? { ...job, hasApplied: true } : job,
+            job._id === jobId
+              ? {
+                  ...job,
+                  hasApplied: true,
+                  applicationStatus: "Applied",
+                  applicantCount: (job.applicantCount || 0) + 1,
+                }
+              : job,
           ),
         );
       }
@@ -216,6 +255,9 @@ const JobSeekerDashboard = () => {
     </div>
   );
 
+  const urgentJobs = jobs.filter((job) => job.isUrgent && job.shiftStartTime);
+  const regularJobs = jobs.filter((job) => !job.isUrgent);
+
   // Early return loading screen handler
   if (jobs.length === 0 && loading) {
     return <LoadingSpinner />;
@@ -225,7 +267,6 @@ const JobSeekerDashboard = () => {
     <div className="scroll-smooth bg-gray-50 min-h-screen">
       <Navbar />
 
-      {/* Hero Search Banner */}
       {/* Hero Search Banner */}
       <div className="mt-16 bg-white border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-14">
@@ -263,7 +304,7 @@ const JobSeekerDashboard = () => {
               <p className="text-sm font-medium text-gray-600">
                 Showing
                 <span className="mx-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-base font-bold text-gray-900">
-                  {jobs.length}
+                  {totalJobs}
                 </span>
                 available opportunities
               </p>
@@ -327,24 +368,114 @@ const JobSeekerDashboard = () => {
                 </button>
               </div>
             ) : (
-              <div
-                className={
-                  viewMode === "grid"
-                    ? "grid grid-cols-1 lg:grid-cols-2 gap-4"
-                    : "flex flex-col gap-4"
-                }
-              >
-                {jobs.map((job) => (
-                  <JobCard
-                    key={job._id}
-                    job={job}
-                    onClick={() => navigate(`/job/${job._id}`)}
-                    onToggleSave={() => toggleSaveJob(job._id, job.isSaved)}
-                    onApply={() => applyToJob(job._id)}
-                  />
-                ))}
+              <div className="space-y-6">
+                {/* 🔴 Urgent Shifts Section */}
+                {urgentJobs.length > 0 && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="flex items-center gap-1.5 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse">
+                        🔴 URGENT SHIFTS
+                      </span>
+                      <span className="text-sm text-orange-700 font-medium">
+                        {urgentJobs.length} shift
+                        {urgentJobs.length > 1 ? "s" : ""} need immediate help
+                      </span>
+                    </div>
+                    <div
+                      className={
+                        viewMode === "grid"
+                          ? "grid grid-cols-1 lg:grid-cols-2 gap-4"
+                          : "flex flex-col gap-4"
+                      }
+                    >
+                      {urgentJobs.map((job) => (
+                        <div key={job._id} className="relative">
+                          {/* Countdown Badge */}
+                          <div className="absolute top-3 right-3 z-10 bg-white border border-orange-200 rounded-lg px-2 py-1">
+                            <CountdownTimer
+                              shiftStartTime={job.shiftStartTime}
+                            />
+                          </div>
+                          <div className="border-2 border-orange-300 rounded-xl overflow-hidden">
+                            <JobCard
+                              job={job}
+                              onClick={() => navigate(`/job/${job._id}`)}
+                              onToggleSave={() =>
+                                toggleSaveJob(job._id, job.isSaved)
+                              }
+                              onApply={() => applyToJob(job._id)}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Regular Jobs */}
+                {regularJobs.length > 0 && (
+                  <div
+                    className={
+                      viewMode === "grid"
+                        ? "grid grid-cols-1 lg:grid-cols-2 gap-4"
+                        : "flex flex-col gap-4"
+                    }
+                  >
+                    {regularJobs.map((job) => (
+                      <JobCard
+                        key={job._id}
+                        job={job}
+                        onClick={() => navigate(`/job/${job._id}`)}
+                        onToggleSave={() => toggleSaveJob(job._id, job.isSaved)}
+                        onApply={() => applyToJob(job._id)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-6">
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (pageNum) => (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-9 h-9 text-sm font-medium rounded-xl transition-colors ${
+                        currentPage === pageNum
+                          ? "bg-indigo-600 text-white"
+                          : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+
           </div>
         </div>
       </div>

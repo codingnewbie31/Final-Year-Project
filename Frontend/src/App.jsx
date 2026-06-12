@@ -1,10 +1,15 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 
 import LandingPage from "./pages/LandingPage/LandingPage";
 import SignUp from "./pages/Auth/SignUp";
 import Login from "./pages/Auth/Login";
-import JobSeekerDashboard from "./pages/JobSeeker/JobSeekerDashboard"
+import JobSeekerDashboard from "./pages/JobSeeker/JobSeekerDashboard";
 import JobDetails from "./pages/JobSeeker/JobDetails";
 import SavedJobs from "./pages/JobSeeker/SavedJobs";
 import UserProfile from "./pages/JobSeeker/UserProfile";
@@ -39,7 +44,7 @@ const App = () => {
             <Route path="/applicants" element={<ApplicationViewer />} />
             <Route path="/company-profile" element={<EmployerProfilePage />} />
           </Route>
-
+          
           {/* Catch all route */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
