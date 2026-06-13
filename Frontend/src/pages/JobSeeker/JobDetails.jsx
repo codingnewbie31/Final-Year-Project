@@ -10,7 +10,7 @@ import { useParams } from "react-router-dom";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 import { useEffect, useState } from "react";
-import Navbar from "../../components/layout/Navbar";
+import Navbar from "../../components/Layout/Navbar";
 import moment from "moment";
 import StatusBadge from "../../components/StatusBadge";
 import toast from "react-hot-toast";

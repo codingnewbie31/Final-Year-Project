@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 import { useEffect, useState } from "react";
-import Navbar from "../../components/layout/Navbar";
+import Navbar from "../../components/Layout/Navbar";
 import JobCard from "../../components/Cards/JobCard";
 import toast from "react-hot-toast";
 

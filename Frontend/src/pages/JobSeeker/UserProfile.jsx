@@ -5,7 +5,7 @@ import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 import toast from "react-hot-toast";
 import uploadImage from "../../utils/uploadImage";
-import Navbar from "../../components/layout/Navbar";
+import Navbar from "../../components/Layout/Navbar";
 import { Link } from "react-router-dom";
 
 const UserProfile = () => {

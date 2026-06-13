@@ -16,7 +16,7 @@ import { API_PATHS } from "../../utils/apiPaths";
 import moment from "moment";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import DashboardLayout from "../../components/layout/DashboardLayout";
+import DashboardLayout from "../../components/Layout/DashboardLayout";
 
 const ManageJobs = () => {
   const navigate = useNavigate();

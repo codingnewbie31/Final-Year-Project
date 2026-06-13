@@ -13,7 +13,7 @@ import { API_PATHS } from "../../utils/apiPaths";
 import { useLocation, useNavigate } from "react-router-dom";
 import moment from "moment";
 import { getInitials } from "../../utils/helper";
-import DashboardLayout from "../../components/layout/DashboardLayout";
+import DashboardLayout from "../../components/Layout/DashboardLayout";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import StatusBadge from "../../components/StatusBadge";
 import ApplicantProfilePreview from "../../components/Cards/ApplicantProfilePreview";

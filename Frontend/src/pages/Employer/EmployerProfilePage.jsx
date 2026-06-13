@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import uploadImage from "../../utils/uploadImage";
 import EditProfileDetails from "./EditProfileDetails";
 
-import DashboardLayout from "../../components/layout/DashboardLayout";
+import DashboardLayout from "../../components/Layout/DashboardLayout";
 
 const EmployerProfilePage = () => {
   const { user, updateUser } = useAuth();
