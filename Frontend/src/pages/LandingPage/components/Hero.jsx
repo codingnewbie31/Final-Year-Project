@@ -68,7 +68,7 @@ const Hero = () => {
                 navigate(
                   isAuthenticated && user?.role === "employer"
                     ? "/employer-dashboard"
-                    : "/login",
+                    : "/signup",
                 );
               }}
             >
