@@ -13,7 +13,10 @@ const app = express();
 
 app.use(express.json());
 
-const allowedOrigins = ["http://localhost:5173", "http://localhost:3000"];
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://final-year-project-neon-one.vercel.app",];
 
 app.use(
   cors({
