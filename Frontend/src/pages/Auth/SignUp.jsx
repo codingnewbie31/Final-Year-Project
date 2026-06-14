@@ -1,70 +1,45 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  User,
-  Mail,
-  Lock,
-  Upload,
-  Eye,
-  EyeOff,
-  UserCheck,
-  Building2,
-  CheckCircle,
-  AlertCircle,
-  Loader,
+  User, Mail, Lock, Upload, Eye, EyeOff, UserCheck,
+  Building2, CheckCircle, AlertCircle, Loader,
 } from "lucide-react";
 import {
-  validateAvatar,
-  validateEmail,
-  validatePassword,
+  validateAvatar, validateEmail, validatePassword,
 } from "../../utils/helper";
 import { API_PATHS } from "../../utils/apiPaths";
 import axiosInstance from "../../utils/axiosInstance";
-import uploadImage from "../../utils/uploadImage"
+import uploadImage from "../../utils/uploadImage";
 import { useAuth } from "../../context/AuthContext";
+import { GoogleLogin } from "@react-oauth/google"; // ← new
 
 const SignUp = () => {
-  const {login} = useAuth();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
-    fullName: "",
-    email: "",
-    password: "",
-    role: "",
-    avatar: null,
+    fullName: "", email: "", password: "", role: "", avatar: null,
   });
 
   const [formState, setFormState] = useState({
-    loading: false,
-    errors: {},
-    showPassword: false,
-    avatarPreview: null,
-    success: false,
+    loading: false, errors: {}, showPassword: false,
+    avatarPreview: null, success: false,
+    showRoleModal: false, // ← new: for Google role selection
   });
 
-  // Handle input changes
+  // ← new: after Google login, we need to ask for role
+  const [pendingGoogleData, setPendingGoogleData] = useState(null);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    // Clear error when user starts typing
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (formState.errors[name]) {
-      setFormState((prev) => ({
-        ...prev,
-        errors: { ...prev.errors, [name]: "" },
-      }));
+      setFormState((prev) => ({ ...prev, errors: { ...prev.errors, [name]: "" } }));
     }
   };
 
   const handleRoleChange = (role) => {
     setFormData((prev) => ({ ...prev, role }));
     if (formState.errors.role) {
-      setFormState((prev) => ({
-        ...prev,
-        errors: { ...prev.errors, role: "" },
-      }));
+      setFormState((prev) => ({ ...prev, errors: { ...prev.errors, role: "" } }));
     }
   };
 
@@ -73,21 +48,14 @@ const SignUp = () => {
     if (file) {
       const error = validateAvatar(file);
       if (error) {
-        setFormState((prev) => ({
-          ...prev,
-          errors: { ...prev.errors, avatar: error },
-        }));
+        setFormState((prev) => ({ ...prev, errors: { ...prev.errors, avatar: error } }));
         return;
       }
-
       setFormData((prev) => ({ ...prev, avatar: file }));
-
-      // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
         setFormState((prev) => ({
-          ...prev,
-          avatarPreview: e.target.result,
+          ...prev, avatarPreview: e.target.result,
           errors: { ...prev.errors, avatar: "" },
         }));
       };
@@ -103,26 +71,17 @@ const SignUp = () => {
       role: !formData.role ? "Please select a role" : "",
       avatar: "",
     };
-
-    // Remove empty errors
-    Object.keys(errors).forEach((key) => {
-      if (!errors[key]) delete errors[key];
-    });
-
+    Object.keys(errors).forEach((key) => { if (!errors[key]) delete errors[key]; });
     setFormState((prev) => ({ ...prev, errors }));
     return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!validateForm()) return;
-
     setFormState((prev) => ({ ...prev, loading: true }));
-
     try {
       let avatarUrl = "";
-      // Upload image if present
       if (formData.avatar) {
         const imgUploadRes = await uploadImage(formData.avatar);
         avatarUrl = imgUploadRes.imageUrl || "";
@@ -134,35 +93,46 @@ const SignUp = () => {
         role: formData.role,
         avatar: avatarUrl || "",
       });
-
-      // Handle successful registration
+      setFormState((prev) => ({ ...prev, loading: false, success: true, errors: {} }));
+      const { token } = response.data;
+      if (token) login(response.data, token);
+      setTimeout(() => {
+        window.location.href = formData.role === "employer" ? "/employer-dashboard" : "/find-jobs";
+      }, 2000);
+    } catch (error) {
       setFormState((prev) => ({
-        ...prev,
-        loading: false,
-        success: true,
-        errors: {},
+        ...prev, loading: false,
+        errors: { submit: error.response?.data?.message || "Registration failed. Please try again." },
       }));
+    }
+  };
+
+  // ← new: Step 1 — Google returns a credential, save it and show role picker
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setPendingGoogleData(credentialResponse);
+    setFormState((prev) => ({ ...prev, showRoleModal: true }));
+  };
+
+  // ← new: Step 2 — user picks a role, now send to backend
+  const handleGoogleRoleSelect = async (role) => {
+    setFormState((prev) => ({ ...prev, showRoleModal: false, loading: true }));
+    try {
+      const response = await axiosInstance.post(API_PATHS.AUTH.GOOGLE, {
+        credential: pendingGoogleData.credential,
+        role, // send chosen role to backend
+      });
       const { token } = response.data;
       if (token) {
         login(response.data, token);
+        setFormState((prev) => ({ ...prev, loading: false, success: true }));
+        setTimeout(() => {
+          window.location.href = role === "employer" ? "/employer-dashboard" : "/find-jobs";
+        }, 2000);
       }
-
-      // Redirect based on role
-      setTimeout(() => {
-        window.location.href =
-          formData.role === "employer" ? "/employer-dashboard" : "/find-jobs";
-      }, 2000);
-
     } catch (error) {
-
       setFormState((prev) => ({
-        ...prev,
-        loading: false,
-        errors: {
-          submit:
-            error.response?.data?.message ||
-            "Registration failed. Please try again.",
-        },
+        ...prev, loading: false,
+        errors: { submit: "Google sign-up failed. Please try again." },
       }));
     }
   };
@@ -171,21 +141,14 @@ const SignUp = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
+          initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
           className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center"
         >
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Account Created!
-          </h2>
-          <p className="text-gray-600 mb-4">
-            Wwlcome to JobPortal! Your account has been successfully created.
-          </p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Account Created!</h2>
+          <p className="text-gray-600 mb-4">Welcome to JobPortal! Your account has been successfully created.</p>
           <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto" />
-          <p className="text-sm text-gray-500 mt-2">
-            Redirecting to your dashboard...
-          </p>
+          <p className="text-sm text-gray-500 mt-2">Redirecting to your dashboard...</p>
         </motion.div>
       </div>
     );
@@ -193,243 +156,210 @@ const SignUp = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+
+      {/* ← new: Role picker modal for Google sign-up */}
+      {formState.showRoleModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+            className="bg-white p-8 rounded-xl shadow-xl max-w-sm w-full mx-4"
+          >
+            <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">One last step!</h3>
+            <p className="text-gray-600 text-center mb-6">How will you be using JobPortal?</p>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => handleGoogleRoleSelect("jobseeker")}
+                className="p-4 rounded-lg border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all"
+              >
+                <UserCheck className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+                <div className="font-medium">Job Seeker</div>
+                <div className="text-xs text-gray-500">Looking for opportunities</div>
+              </button>
+              <button
+                onClick={() => handleGoogleRoleSelect("employer")}
+                className="p-4 rounded-lg border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all"
+              >
+                <Building2 className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+                <div className="font-medium">Employer</div>
+                <div className="text-xs text-gray-500">Hiring talent</div>
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
         className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full"
       >
         <div className="text-center mb-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            Create Account
-          </h2>
-          <p className="text-sm text-gray-600">
-            Join thousands of professionals finding their dream jobs
-          </p>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Create Account</h2>
+          <p className="text-sm text-gray-600">Join thousands of professionals finding their dream jobs</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Full Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Full Name *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
-                type="text"
-                name="fullName"
-                value={formData.fullName}
-                onChange={handleInputChange}
-                className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
-                  formState.errors.fullName
-                    ? "border-red-500"
-                    : "border-gray-300"
-                } focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors`}
+                type="text" name="fullName" value={formData.fullName} onChange={handleInputChange}
+                className={`w-full pl-10 pr-4 py-3 rounded-lg border ${formState.errors.fullName ? "border-red-500" : "border-gray-300"} focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors`}
                 placeholder="Enter your full name"
               />
             </div>
             {formState.errors.fullName && (
               <p className="text-red-500 text-sm mt-1 flex items-center">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                {formState.errors.fullName}
+                <AlertCircle className="w-4 h-4 mr-1" />{formState.errors.fullName}
               </p>
             )}
           </div>
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
-                  formState.errors.email ? "border-red-500" : "border-gray-300"
-                } focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors`}
+                type="email" name="email" value={formData.email} onChange={handleInputChange}
+                className={`w-full pl-10 pr-4 py-3 rounded-lg border ${formState.errors.email ? "border-red-500" : "border-gray-300"} focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors`}
                 placeholder="Enter your email"
               />
             </div>
             {formState.errors.email && (
               <p className="text-red-500 text-sm mt-1 flex items-center">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                {formState.errors.email}
+                <AlertCircle className="w-4 h-4 mr-1" />{formState.errors.email}
               </p>
             )}
           </div>
 
           {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type={formState.showPassword ? "text" : "password"}
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                className={`w-full pl-10 pr-12 py-3 rounded-lg border ${
-                  formState.errors.password
-                    ? "border-red-500"
-                    : "border-gray-300"
-                } focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors`}
+                name="password" value={formData.password} onChange={handleInputChange}
+                className={`w-full pl-10 pr-12 py-3 rounded-lg border ${formState.errors.password ? "border-red-500" : "border-gray-300"} focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors`}
                 placeholder="Create a strong password"
               />
               <button
                 type="button"
-                onClick={() =>
-                  setFormState((prev) => ({
-                    ...prev,
-                    showPassword: !prev.showPassword,
-                  }))
-                }
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 "
+                onClick={() => setFormState((prev) => ({ ...prev, showPassword: !prev.showPassword }))}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                {formState.showPassword ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
+                {formState.showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
             {formState.errors.password && (
               <p className="text-red-500 text-sm mt-1 flex items-center">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                {formState.errors.password}
+                <AlertCircle className="w-4 h-4 mr-1" />{formState.errors.password}
               </p>
             )}
           </div>
 
           {/* Avatar Upload */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Profile Picture (Optional)
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Profile Picture (Optional)</label>
             <div className="flex items-center space-x-4">
               <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
                 {formState.avatarPreview ? (
-                  <img
-                    src={formState.avatarPreview}
-                    alt="Avatar preview"
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={formState.avatarPreview} alt="Avatar preview" className="w-full h-full object-cover" />
                 ) : (
                   <User className="w-8 h-8 text-gray-400" />
                 )}
               </div>
               <div className="flex-1">
-                <input
-                  type="file"
-                  id="avatar"
-                  accept=".jpg,.jpeg,.png"
-                  onChange={handleAvatarChange}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="avatar"
-                  className="cursor-pointer bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center space-x-2 "
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>Upload Photo</span>
+                <input type="file" id="avatar" accept=".jpg,.jpeg,.png" onChange={handleAvatarChange} className="hidden" />
+                <label htmlFor="avatar" className="cursor-pointer bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center space-x-2">
+                  <Upload className="w-4 h-4" /><span>Upload Photo</span>
                 </label>
                 <p className="text-xs text-gray-500 mt-1">JPG, PNG up to 5MB</p>
               </div>
-              {formState.errors.avatar && (
-                <p className="text-red-500 text-sm mt-1 flex items-center">
-                  <AlertCircle className="w-5 h-5 mr-1" />
-                  {formState.errors.avatar}
-                </p>
-              )}
             </div>
+          </div>
 
-            {/* Role Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                I am a *
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => handleRoleChange("jobseeker")}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    formData.role === "jobseeker"
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <UserCheck className="w-8 h-8 mx-auto mb-2" />
-                  <div className="font-medium">Job Seeker</div>
-                  <div className="text-xs text-gray-500">
-                    Looking for opportunities
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleRoleChange("employer")}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    formData.role === "employer"
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <Building2 className="w-8 h-8 mx-auto mb-2" />
-                  <div className="font-medium">Employer</div>
-                  <div className="text-xs text-gray-500">Hiring talent</div>
-                </button>
-              </div>
-              {formState.errors.role && (
-                <p className="text-red-500 text-sm mt-2 flex items-center">
-                  <AlertCircle className="w-4 h-4 mr-1" />
-                  {formState.errors.role}
-                </p>
-              )}
+          {/* Role Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">I am a *</label>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                type="button" onClick={() => handleRoleChange("jobseeker")}
+                className={`p-4 rounded-lg border-2 transition-all ${formData.role === "jobseeker" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 hover:border-gray-300"}`}
+              >
+                <UserCheck className="w-8 h-8 mx-auto mb-2" />
+                <div className="font-medium">Job Seeker</div>
+                <div className="text-xs text-gray-500">Looking for opportunities</div>
+              </button>
+              <button
+                type="button" onClick={() => handleRoleChange("employer")}
+                className={`p-4 rounded-lg border-2 transition-all ${formData.role === "employer" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 hover:border-gray-300"}`}
+              >
+                <Building2 className="w-8 h-8 mx-auto mb-2" />
+                <div className="font-medium">Employer</div>
+                <div className="text-xs text-gray-500">Hiring talent</div>
+              </button>
             </div>
-
-            {/* Submit Error */}
-            {formState.errors.submit && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-red-700 text-sm flex items-center">
-                  <AlertCircle className="w-4 h-4 mr-2" />
-                  {formState.errors.submit}
-                </p>
-              </div>
+            {formState.errors.role && (
+              <p className="text-red-500 text-sm mt-2 flex items-center">
+                <AlertCircle className="w-4 h-4 mr-1" />{formState.errors.role}
+              </p>
             )}
+          </div>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={formState.loading}
-              className="w-full bg-linear-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 "
-            >
-              {formState.loading ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin" />
-                  <span>Creating Account...</span>
-                </>
-              ) : (
-                <span>Create Account</span>
-              )}
-            </button>
-
-            {/* Login Link */}
-            <div className="text-center">
-              <p className="text-gray-600">
-                Already have an account?{" "}
-                <a
-                  href="/login"
-                  className="text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  Sign in here
-                </a>
+          {/* Submit Error */}
+          {formState.errors.submit && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-red-700 text-sm flex items-center">
+                <AlertCircle className="w-4 h-4 mr-2" />{formState.errors.submit}
               </p>
             </div>
+          )}
+
+          {/* Submit Button */}
+          <button
+            type="submit" disabled={formState.loading}
+            className="w-full bg-linear-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+          >
+            {formState.loading ? (
+              <><Loader className="w-5 h-5 animate-spin" /><span>Creating Account...</span></>
+            ) : (
+              <span>Create Account</span>
+            )}
+          </button>
+
+          {/* ← new: Google Sign Up */}
+          <div className="relative flex items-center justify-center my-2">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <span className="relative bg-white px-4 text-sm text-gray-500">or</span>
+          </div>
+
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() =>
+                setFormState((prev) => ({
+                  ...prev,
+                  errors: { submit: "Google sign-up failed. Please try again." },
+                }))
+              }
+              width="368"
+              text="signup_with"
+              shape="rectangular"
+            />
+          </div>
+
+          {/* Login Link */}
+          <div className="text-center">
+            <p className="text-gray-600">
+              Already have an account?{" "}
+              <a href="/login" className="text-blue-600 hover:text-blue-700 font-medium">Sign in here</a>
+            </p>
           </div>
         </form>
       </motion.div>

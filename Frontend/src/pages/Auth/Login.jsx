@@ -1,19 +1,14 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  Loader,
-  AlertCircle,
-  CheckCircle,
+  Mail, Lock, Eye, EyeOff, Loader, AlertCircle, CheckCircle,
 } from "lucide-react";
 import { validateEmail } from "../../utils/helper";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { API_PATHS } from "../../utils/apiPaths";
 import axiosInstance from "../../utils/axiosInstance";
+import { GoogleLogin } from "@react-oauth/google"; // ← new
 
 const Login = () => {
   const { login } = useAuth();
@@ -36,15 +31,9 @@ const Login = () => {
     return "";
   };
 
-  // Handle input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    // Clear error when user starts typing
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (formState.errors[name]) {
       setFormState((prev) => ({
         ...prev,
@@ -53,49 +42,30 @@ const Login = () => {
     }
   };
 
-  //validate Form
   const validateForm = () => {
     const errors = {
       email: validateEmail(formData.email),
       password: validatePassword(formData.password),
     };
-
-    // Remove empty errors
-    Object.keys(errors).forEach((key) => {
-      if (!errors[key]) delete errors[key];
-    });
-
+    Object.keys(errors).forEach((key) => { if (!errors[key]) delete errors[key]; });
     setFormState((prev) => ({ ...prev, errors }));
     return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!validateForm()) return;
-
     setFormState((prev) => ({ ...prev, loading: true }));
-
     try {
       const response = await axiosInstance.post(API_PATHS.AUTH.LOGIN, {
         email: formData.email,
         password: formData.password,
         rememberMe: formData.rememberMe,
       });
-
       const { token, role } = response.data;
-
       if (token) {
         login(response.data, token);
-
-        setFormState((prev) => ({
-          ...prev,
-          loading: false,
-          success: true,
-          errors: {},
-        }));
-
-        // Single redirect based on role
+        setFormState((prev) => ({ ...prev, loading: false, success: true, errors: {} }));
         setTimeout(() => {
           navigate(role === "employer" ? "/employer-dashboard" : "/find-jobs");
         }, 1500);
@@ -105,10 +75,32 @@ const Login = () => {
         ...prev,
         loading: false,
         errors: {
-          submit:
-            error.response?.data?.message ||
-            "Login failed. Please check your credentials.",
+          submit: error.response?.data?.message || "Login failed. Please check your credentials.",
         },
+      }));
+    }
+  };
+
+  // ← new: handle Google login
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      const response = await axiosInstance.post(API_PATHS.AUTH.GOOGLE, {
+        credential: credentialResponse.credential,
+      });
+
+      const { token, role } = response.data;
+
+      if (token) {
+        login(response.data, token);
+        setFormState((prev) => ({ ...prev, success: true }));
+        setTimeout(() => {
+          navigate(role === "employer" ? "/employer-dashboard" : "/find-jobs");
+        }, 1500);
+      }
+    } catch (error) {
+      setFormState((prev) => ({
+        ...prev,
+        errors: { submit: "Google sign-in failed. Please try again." },
       }));
     }
   };
@@ -122,16 +114,10 @@ const Login = () => {
           className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center"
         >
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Welcome Back!
-          </h2>
-          <p className="text-gray-600 mb-4">
-            You have been successfully logged in.
-          </p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back!</h2>
+          <p className="text-gray-600 mb-4">You have been successfully logged in.</p>
           <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto" />
-          <p className="text-sm text-gray-500 mt-2">
-            Redirecting to your dashboard...
-          </p>
+          <p className="text-sm text-gray-500 mt-2">Redirecting to your dashboard...</p>
         </motion.div>
       </div>
     );
@@ -146,18 +132,14 @@ const Login = () => {
         className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full"
       >
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Welcome Back
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h2>
           <p className="text-gray-600">Sign in to your JobPortal account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray w-5 h-5" />
               <input
@@ -173,17 +155,14 @@ const Login = () => {
             </div>
             {formState.errors.email && (
               <p className="text-red-500 text-sm mt-1 flex items-center">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                {formState.errors.email}
+                <AlertCircle className="w-4 h-4 mr-1" /> {formState.errors.email}
               </p>
             )}
           </div>
 
           {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
@@ -192,33 +171,21 @@ const Login = () => {
                 value={formData.password}
                 onChange={handleInputChange}
                 className={`w-full pl-10 pr-12 py-3 rounded-lg border ${
-                  formState.errors.password
-                    ? "border-red-500"
-                    : "border-gray-300"
+                  formState.errors.password ? "border-red-500" : "border-gray-300"
                 } focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors`}
                 placeholder="Enter your password"
               />
               <button
                 type="button"
-                onClick={() =>
-                  setFormState((prev) => ({
-                    ...prev,
-                    showPassword: !prev.showPassword,
-                  }))
-                }
+                onClick={() => setFormState((prev) => ({ ...prev, showPassword: !prev.showPassword }))}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                {formState.showPassword ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
+                {formState.showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
             {formState.errors.password && (
               <p className="text-red-500 text-sm mt-1 flex items-center">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                {formState.errors.password}
+                <AlertCircle className="w-4 h-4 mr-1" /> {formState.errors.password}
               </p>
             )}
           </div>
@@ -227,8 +194,7 @@ const Login = () => {
           {formState.errors.submit && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
               <p className="text-red-700 text-sm flex items-center">
-                <AlertCircle className="w-4 h-4 mr-2" />
-                {formState.errors.submit}
+                <AlertCircle className="w-4 h-4 mr-2" /> {formState.errors.submit}
               </p>
             </div>
           )}
@@ -240,23 +206,40 @@ const Login = () => {
             className="w-full bg-linear-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
           >
             {formState.loading ? (
-              <>
-                <Loader className="w-5 h-5 animate-spin" />
-                <span>Signing In...</span>
-              </>
+              <><Loader className="w-5 h-5 animate-spin" /><span>Signing In...</span></>
             ) : (
               <span>Sign In</span>
             )}
           </button>
 
+          {/* ← new: Google Sign In */}
+          <div className="relative flex items-center justify-center my-2">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <span className="relative bg-white px-4 text-sm text-gray-500">or</span>
+          </div>
+
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() =>
+                setFormState((prev) => ({
+                  ...prev,
+                  errors: { submit: "Google sign-in failed. Please try again." },
+                }))
+              }
+              width="368"
+              text="signin_with"
+              shape="rectangular"
+            />
+          </div>
+
           {/* Sign Up Link */}
           <div className="text-center">
             <p className="text-gray-600">
               Don't have an account?{" "}
-              <a
-                href="/signup"
-                className="text-blue-600 hover:text-blue-700 font-medium"
-              >
+              <a href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
                 Create one here
               </a>
             </p>
