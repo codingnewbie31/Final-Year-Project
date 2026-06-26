@@ -8,7 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { API_PATHS } from "../../utils/apiPaths";
 import axiosInstance from "../../utils/axiosInstance";
-import { GoogleLogin } from "@react-oauth/google"; // ← new
+import { GoogleLogin } from "@react-oauth/google"; 
 
 const Login = () => {
   const { login } = useAuth();

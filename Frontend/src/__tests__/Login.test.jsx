@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 
 // ── Mock framer-motion ───────────────────────────────────────────────
 vi.mock('framer-motion', () => ({
@@ -33,9 +34,11 @@ import Login from '../pages/Auth/Login'
 
 // ── Helper to render with Router ─────────────────────────────────────
 const renderLogin = () => render(
-  <MemoryRouter>
-    <Login />
-  </MemoryRouter>
+  <GoogleOAuthProvider clientId="test-client-id">
+    <MemoryRouter>
+      <Login />
+    </MemoryRouter>
+  </GoogleOAuthProvider>
 )
 
 // ────────────────────────────────────────────────────────────────────
