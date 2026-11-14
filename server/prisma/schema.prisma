@@ -32,6 +32,8 @@ enum PayUnit {
   HOURLY
   DAILY
   PER_SHIFT
+  WEEKLY
+  MONTHLY
 }
 
 enum ShiftStatus {
