@@ -24,6 +24,6 @@ ALTER TABLE "availability_slots"
 -- must not pretend it was.
 ALTER TABLE "applications"
   ADD CONSTRAINT "applications_decided_at" CHECK (
-    ("status" IN ('ACCEPTED', 'DECLINED') AND "decidedAt" IS NOT NULL)
-    OR ("status" NOT IN ('ACCEPTED', 'DECLINED') AND "decidedAt" IS NULL)
+    ("status" IN ('ACCEPTED', 'REJECTED') AND "decidedAt" IS NOT NULL)
+    OR ("status" NOT IN ('ACCEPTED', 'REJECTED') AND "decidedAt" IS NULL)
   );

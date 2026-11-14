@@ -44,7 +44,7 @@ enum ApplicationStatus {
   APPLIED
   IN_REVIEW
   ACCEPTED
-  DECLINED
+  REJECTED
   WITHDRAWN
 }
 
