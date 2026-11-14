@@ -1,0 +1,296 @@
+// Haazir v2 — PostgreSQL schema
+//
+// v1 stored everything in MongoDB with five loose collections. The rules the
+// thesis cares about (a shift must show its pay, a person may apply once) were
+// only checked in JavaScript, so a bad request or a direct database write could
+// break them. Here those rules live in the database itself: required columns,
+// unique constraints, foreign keys and CHECK constraints.
+//
+// Naming: v1 called a posting a "Job". v2 calls it a Shift, because the product
+// is short local shift work, not careers.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── enums ─────────────────────────
+
+enum Role {
+  JOB_SEEKER
+  EMPLOYER
+  ADMIN
+}
+
+/// How a shift pays. Stored separately from the amount so "Rs 450 an hour" and
+/// "Rs 3,000 a shift" can be compared and sorted properly.
+enum PayUnit {
+  HOURLY
+  DAILY
+  PER_SHIFT
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+  FILLED
+}
+
+enum ApplicationStatus {
+  APPLIED
+  IN_REVIEW
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+}
+
+enum Weekday {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
+// ───────────────────────── people ─────────────────────────
+
+model User {
+  id           String  @id @default(cuid())
+  /// Always stored lower-cased by the API, so the unique index is case-safe.
+  email        String  @unique
+  /// Null for accounts created through Google. One of passwordHash or googleId
+  /// must be set; enforced by a CHECK constraint in the migration.
+  passwordHash String?
+  googleId     String? @unique
+  role         Role
+  fullName     String
+  phone        String?
+  avatarUrl    String?
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  seekerProfile SeekerProfile?
+  business      Business?
+  applications  Application[]
+  savedShifts   SavedShift[]
+  refreshTokens RefreshToken[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model SeekerProfile {
+  id       String @id @default(cuid())
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  headline String?
+  bio      String? @db.Text
+  city     String
+  area     String?
+  resumeUrl String?
+  /// Plain text pulled out of the uploaded CV. Empty for now; the AI service
+  /// fills it later and the embedding column is added in its own migration.
+  resumeText String? @db.Text
+
+  skills       SeekerSkill[]
+  availability AvailabilitySlot[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([city, area])
+  @@map("seeker_profiles")
+}
+
+model Business {
+  id      String @id @default(cuid())
+  ownerId String @unique
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String? @db.Text
+  logoUrl     String?
+  city        String
+  area        String?
+
+  shifts Shift[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([city, area])
+  @@map("businesses")
+}
+
+// ───────────────────────── skills and hours ─────────────────────────
+
+/// A shared vocabulary, so "waiter" on a CV and "waiter" on a shift are the same
+/// row. v1 kept skills as free text on each document, which made matching
+/// impossible. This table is what the AI matching will join against later.
+model Skill {
+  id   String @id @default(cuid())
+  name String @unique
+  slug String @unique
+
+  seekers SeekerSkill[]
+  shifts  ShiftSkill[]
+
+  @@map("skills")
+}
+
+model SeekerSkill {
+  seekerId String
+  seeker   SeekerProfile @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+  skillId  String
+  skill    Skill         @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([seekerId, skillId])
+  @@map("seeker_skills")
+}
+
+model ShiftSkill {
+  shiftId String
+  shift   Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  skillId String
+  skill   Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([shiftId, skillId])
+  @@map("shift_skills")
+}
+
+/// "Filter by the hours you're free." Times are minutes from midnight, which
+/// keeps the comparison a plain integer range check.
+model AvailabilitySlot {
+  id       String        @id @default(cuid())
+  seekerId String
+  seeker   SeekerProfile @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+
+  weekday     Weekday
+  startMinute Int
+  endMinute   Int
+
+  @@unique([seekerId, weekday, startMinute])
+  @@index([weekday, startMinute, endMinute])
+  @@map("availability_slots")
+}
+
+// ───────────────────────── shifts ─────────────────────────
+
+model Category {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  slug   String  @unique
+  shifts Shift[]
+
+  @@map("categories")
+}
+
+model Shift {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  title        String
+  description  String  @db.Text
+  requirements String? @db.Text
+
+  city String
+  area String
+
+  /// Not nullable, on purpose. This is the thesis's central claim enforced in
+  /// the database: a shift cannot exist without its pay. A CHECK constraint in
+  /// the migration also rejects zero and negative amounts.
+  payAmount Decimal @db.Decimal(10, 2)
+  payUnit   PayUnit
+  currency  String  @default("PKR")
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  isUrgent Boolean     @default(false)
+  status   ShiftStatus @default(OPEN)
+
+  applications Application[]
+  savedBy      SavedShift[]
+  skills       ShiftSkill[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, startsAt])
+  @@index([city, area, status])
+  @@index([categoryId, status])
+  @@index([isUrgent, startsAt])
+  @@map("shifts")
+}
+
+model Application {
+  id          String @id @default(cuid())
+  shiftId     String
+  shift       Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  applicantId String
+  applicant   User   @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  status  ApplicationStatus @default(APPLIED)
+  message String?           @db.Text
+  /// The CV as it was at the moment of applying, so a later profile edit does
+  /// not rewrite history for the employer.
+  resumeUrlSnapshot String?
+
+  decidedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  /// One application per person per shift. In v1 nothing stopped a double
+  /// submission; here the database refuses it.
+  @@unique([shiftId, applicantId])
+  @@index([applicantId, status])
+  @@index([shiftId, status])
+  @@map("applications")
+}
+
+model SavedShift {
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shiftId String
+  shift   Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([userId, shiftId])
+  @@index([userId, createdAt])
+  @@map("saved_shifts")
+}
+
+// ───────────────────────── sessions ─────────────────────────
+
+/// v1 handed out a 60-day JWT and kept it in localStorage, so a stolen token
+/// worked for two months and could not be cancelled. v2 issues a short access
+/// token plus a refresh token stored here as a hash, so sessions can be revoked
+/// and a leaked database row is not itself a usable token.
+model RefreshToken {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String  @unique
+  userAgent String?
+  ip        String?
+
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, revokedAt])
+  @@map("refresh_tokens")
+}
