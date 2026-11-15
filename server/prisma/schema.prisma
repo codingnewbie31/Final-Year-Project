@@ -14,8 +14,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ───────────────────────── enums ─────────────────────────
@@ -216,6 +217,8 @@ model Shift {
   payAmount Decimal @db.Decimal(10, 2)
   payUnit   PayUnit
   currency  String  @default("PKR")
+  /// Only for WEEKLY and MONTHLY pay, so an hourly rate can be worked out.
+  hoursPerWeek Int?
 
   startsAt DateTime
   endsAt   DateTime
